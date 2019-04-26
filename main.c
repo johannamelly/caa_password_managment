@@ -51,7 +51,7 @@ int main(int argc, char*argv[]) {
         }
 
 
-    password_recover("problem");
+    printf("%s", password_recover("johanna"));
    /*
         char* name = malloc(36*(sizeof(char*)));
         char* password = locked_allocation(36*(sizeof(char*)));

@@ -153,14 +153,14 @@ unsigned char* password_recover(char* name) {
     unsigned long long password_len;
     char* line = NULL;
     size_t len = 0;
-    char* cipher = locked_allocation(256);
-    char* nonce = locked_allocation(256);
+    char* cipher = malloc(256);
+    char* nonce = malloc(256);
 
     // Récupération du mot de passe chiffré et du nonce correspondant
     FILE* allPW = fopen(ALLPW_FILENAME, "r");
+
     // Parcours ligne par ligne
     while (getline(&line, &len, allPW) != -1) {
-
         // Si l'entrée demandée est trouvée
         if (strstr(line , name )!= NULL)
         {
@@ -168,12 +168,8 @@ unsigned char* password_recover(char* name) {
             cipher = strtok(line, SEPARATOR);
             cipher = strtok(NULL, SEPARATOR);
             nonce = strtok(NULL, SEPARATOR);
-            printf("%s %s", cipher, nonce);
-        } else {
-            // Libération des pointeurs
-            free(password);
-            free_buffer(key, crypto_pwhash_STRBYTES);
-            return NULL;
+            nonce = strtok(nonce, "\n");
+            break;
         }
     }
 
@@ -187,11 +183,12 @@ unsigned char* password_recover(char* name) {
         // Si échec, libération des pointeurs
         free_buffer(key, crypto_pwhash_STRBYTES);
         free(password);
+        printf("Error!\n");
         return NULL;
     }
 
     // Libération des pointeurs
-    free(password);
+    //free(password);
     free_buffer(key, crypto_pwhash_STRBYTES);
 
     return password;
