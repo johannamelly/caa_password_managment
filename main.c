@@ -2,7 +2,10 @@
 #include <sodium.h>
 #include <stdbool.h>
 #include "memory.c"
+#include "actions.c"
 #include "password_management.c"
+
+bool login();
 
 enum state {
     NOT_RUNNING,
@@ -15,6 +18,10 @@ enum state currentSate = NOT_RUNNING;
 
 int main(int argc, char*argv[]) {
 
+    currentSate = LOCKED;
+
+    int choice;
+
     if(sodium_init() < 0){
         printf("Couldn't initialize the library");
         return(-1);
@@ -22,33 +29,47 @@ int main(int argc, char*argv[]) {
 
     printf("Welcome!\n");
 
+    while(currentSate == LOCKED) {
+        if(login()){
+            currentSate = UNLOCKED;
+            while(currentSate == UNLOCKED) {
+                printf("What's your choice?\n");
+                printf("1 - Add password\n");
+                printf("2 - Find password\n");
+                printf("3 - List all entries\n");
+                printf("4 - Change master password\n");
+                printf("5 - Lock\n");
+                printf("6 - Quit\n");
 
 
-        if(!masterPWdefined()) {
-            char* mpw = locked_allocation(36*(sizeof(char*)));
-
-            printf("You haven't defined a master password yet. Please provide a master password: ");
-            scanf("%36s", mpw);
-            if(masterPassword_storage(mpw)){
-                printf("Success!\n");
-                key_derivation_and_storage();
-            } else {
-                printf("Sorry, we were not able to create your password.\n");
-                //TODO free buffer and terminate program
+                scanf("%d", &choice);
+                switch(choice){
+                    case 1:
+                        printf("hello\n");
+                        break;
+                    case 3:
+                        printf("You store passwords for: ");
+                        list_names();
+                        printf("\n");
+                        break;
+                    case 5:
+                        printf("Session locked.\n");
+                        currentSate = LOCKED;
+                        break;
+                    case 6:
+                        currentSate = NOT_RUNNING;
+                        return 0;
+                    default:
+                        currentSate = NOT_RUNNING;
+                        return 0;
+                }
             }
-            free_buffer(mpw, 36*(sizeof(char*)));
-        } else {
-            char* mpw = locked_allocation(36*(sizeof(char*)));
-
-            printf("Please provide your master password: ");
-            scanf("%36s", mpw);
-            if(masterPassword_verify(mpw)) {
-                printf("Successful login.");
-            } else {
-                printf("Failed to login.");
-            }
-            free_buffer(mpw, 36* sizeof(char*));
         }
+    }
+
+
+
+
 
 
     printf("%s", password_recover("johanna"));
@@ -75,11 +96,6 @@ int main(int argc, char*argv[]) {
         randombytes_buf(buf, 20);
         printf("%s",buf);
 */
-        currentSate = LOCKED;
-
-
-
 
     return 0;
 }
-
