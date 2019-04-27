@@ -9,10 +9,7 @@
 #include <errno.h>
 
 void* locked_allocation(size_t nb_bytes){
-    if(sodium_init() < 0){
-        printf("Couldn't initialize the library");
-        return NULL;
-    }
+
     void* mem = sodium_malloc(nb_bytes);
 
     if(mem == NULL){

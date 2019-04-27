@@ -4,8 +4,7 @@
 #include "memory.c"
 #include "actions.c"
 #include "password_management.c"
-
-bool login();
+#include "base64.h"
 
 enum state {
     NOT_RUNNING,
@@ -17,6 +16,14 @@ enum state {
 enum state currentSate = NOT_RUNNING;
 
 int main(int argc, char*argv[]) {
+    //const char* lou = "PANTALONDEMAMANààà3éà3à3ààà";
+
+    //char* encoded = malloc(300);
+    //char* decoded = malloc(300);
+    //sodium_bin2base64(encoded, 300, lou, strlen(lou), sodium_base64_VARIANT_ORIGINAL);
+    //printf("%s", encoded);
+    //((sodium_base642bin(decoded, 300, encoded, strlen(encoded), NULL, strlen(decoded), NULL, sodium_base64_VARIANT_ORIGINAL);
+    //printf("%s", decoded);
 
     currentSate = LOCKED;
 
@@ -32,6 +39,7 @@ int main(int argc, char*argv[]) {
     while(currentSate == LOCKED) {
         if(login()){
             currentSate = UNLOCKED;
+
             while(currentSate == UNLOCKED) {
                 printf("What's your choice?\n");
                 printf("1 - Add password\n");
@@ -45,7 +53,10 @@ int main(int argc, char*argv[]) {
                 scanf("%d", &choice);
                 switch(choice){
                     case 1:
-                        printf("hello\n");
+                        add_password();
+                        break;
+                    case 2:
+                        get_password();
                         break;
                     case 3:
                         printf("You store passwords for: ");

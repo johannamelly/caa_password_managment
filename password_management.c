@@ -7,13 +7,14 @@
 #include <sodium.h>
 #include <memory.h>
 #include "memory.c"
-
+#include "base64.c"
+#pragma once
 #define CONTEXT "Pencrypt"
 
 const char* MASTERKEY_FILENAME = "masterKey.txt";
 const char* MASTERPW_FILENAME = "masterPW.txt";
 const char* ALLPW_FILENAME = "allPW.txt";
-const char* SEPARATOR = "\t";
+char* SEPARATOR = "\t";
 const char* NEW_LINE = "\n";
 
 
@@ -93,12 +94,14 @@ bool masterPWdefined() {
 }
 
 
-bool password_storage(char* name, char* password) {
+void password_storage(char* name, const unsigned char* password) {
 
     // Allocations mémoire
     unsigned char* key = locked_allocation(crypto_pwhash_STRBYTES);
     char* buff = locked_allocation(512*sizeof(char));
-    unsigned char* pw = malloc(300);
+    unsigned char* pw = malloc(300*sizeof(char));
+    char* nonceB64 = malloc(300);
+    char* cipherB64 = malloc(300);
 
     // Récupération de la master key
     FILE* masterKey = fopen(MASTERKEY_FILENAME, "r");
@@ -110,21 +113,26 @@ bool password_storage(char* name, char* password) {
     randombytes_buf(nonce, sizeof nonce);
 
     // Variables utiles au chiffrement
-    unsigned char ciphertext[strlen(password) + crypto_aead_chacha20poly1305_ABYTES];
+    unsigned char ciphertext[strlen((char*)password) + crypto_aead_chacha20poly1305_ABYTES];
     unsigned long long ciphertext_len;
-    unsigned long long password_len;
 
     // Chiffrement
     crypto_aead_chacha20poly1305_encrypt(ciphertext, &ciphertext_len,
-                                         password, strlen(password),
+                                         password, strlen((char*)password),
                                          NULL, 0,
                                          NULL, nonce, key);
 
+    sodium_bin2base64(nonceB64, 300, nonce, strlen((char*)nonce), sodium_base64_VARIANT_ORIGINAL);
+    sodium_bin2base64(cipherB64, 300, ciphertext, strlen((char*)ciphertext), sodium_base64_VARIANT_ORIGINAL);
+    //Base64encode(nonceB64, nonce, strlen(nonce));
+    //Base64encode(cipherB64, ciphertext, strlen(ciphertext));
+
+
     // Taille totale de la ligne stockée
-    size_t strsize = strlen(name) + strlen(SEPARATOR) + strlen((char*)key) + strlen(NEW_LINE) + strlen((char*)nonce);
+    size_t strsize = strlen(NEW_LINE) + strlen(name) + strlen(SEPARATOR) + strlen(cipherB64) + strlen(SEPARATOR) + strlen(nonceB64);
 
     // Stockage dans un fichier
-    snprintf(buff, strsize, "%s%s%s%s%s%s", NEW_LINE, name, SEPARATOR, ciphertext, SEPARATOR, nonce);
+    snprintf(buff, strsize, "%s%s%s%s%s%s", NEW_LINE, name, SEPARATOR, cipherB64, SEPARATOR, nonceB64);
     FILE* allPW = fopen(ALLPW_FILENAME, "a+");
     fprintf(allPW, "%s", buff);
     fclose(allPW);
@@ -133,8 +141,9 @@ bool password_storage(char* name, char* password) {
     // Libération des pointeurs
     free_buffer(key, crypto_pwhash_STRBYTES);
     free_buffer(buff, 512* sizeof(char));
+    free(cipherB64);
+    free(nonceB64);
     free(pw);
-    return true;
 
 }
 
@@ -143,7 +152,7 @@ unsigned char* password_recover(char* name) {
 
     // Allocations mémoire
     unsigned char* key = locked_allocation(crypto_pwhash_STRBYTES);
-    unsigned char* password = malloc(256*sizeof(char));
+    unsigned char* password = malloc(300*sizeof(char) + crypto_aead_chacha20poly1305_ABYTES);
 
     // Récupération de la master key
     FILE* masterKey = fopen(MASTERKEY_FILENAME, "r");
@@ -153,12 +162,16 @@ unsigned char* password_recover(char* name) {
     unsigned long long password_len;
     char* line = NULL;
     size_t len = 0;
-    char* cipher = malloc(256);
-    char* nonce = malloc(256);
+    char* cipher = NULL;
+    char* nonce = NULL;
+    unsigned char* const nonceDecoded = malloc(400);
+    unsigned char* const cipherDecoded = malloc(400);
 
     // Récupération du mot de passe chiffré et du nonce correspondant
     FILE* allPW = fopen(ALLPW_FILENAME, "r");
-
+    if(allPW == NULL) {
+        return NULL;
+    }
     // Parcours ligne par ligne
     while (getline(&line, &len, allPW) != -1) {
         // Si l'entrée demandée est trouvée
@@ -173,23 +186,50 @@ unsigned char* password_recover(char* name) {
         }
     }
 
+    if(nonce == NULL || cipher == NULL) {
+        printf("NULL");
+        free_buffer(key, crypto_pwhash_STRBYTES);
+        free(password);
+        free(nonceDecoded);
+        free(cipherDecoded);
+        return NULL;
+    }
+
+    fclose(allPW);
+
+    size_t len1;
+    size_t len2;
+
+    printf("%s -> %s", cipher, nonce);
+    sodium_base642bin(nonceDecoded, 400, nonce, strlen(nonce), NULL, &len1, NULL, sodium_base64_VARIANT_ORIGINAL);
+    sodium_base642bin(cipherDecoded, 400, cipher, strlen(cipher), NULL, &len2, NULL, sodium_base64_VARIANT_ORIGINAL);
+    //Base64decode(nonceDecoded, nonce);
+    //Base64decode(cipherDecoded, cipher);
+
     // Déchiffrement
     if (crypto_aead_chacha20poly1305_decrypt(password, &password_len,
                                              NULL,
-                                             cipher, strlen(cipher),
+                                             cipherDecoded, strlen((char*)cipherDecoded),
                                              NULL,
                                              0,
-                                             nonce, key) != 0) {
+                                             nonceDecoded, key) != 0) {
         // Si échec, libération des pointeurs
         free_buffer(key, crypto_pwhash_STRBYTES);
         free(password);
+        free(nonceDecoded);
+        free(cipherDecoded);
         printf("Error!\n");
         return NULL;
     }
 
+    password[password_len] = 0;
     // Libération des pointeurs
     //free(password);
     free_buffer(key, crypto_pwhash_STRBYTES);
+    free(nonceDecoded);
+    free(cipherDecoded);
+    //free(nonce);
+    //free(cipher);
 
     return password;
 
@@ -202,7 +242,9 @@ void key_derivation_and_storage() {
     unsigned char* hashed_password = locked_allocation(crypto_pwhash_STRBYTES);
 
     // Buffer qui contiendra la clé
-    uint8_t subkey1[64];
+    unsigned char* subkey1 = locked_allocation(64);
+
+
 
     // Récupération du master password
     FILE* masterPWhash = fopen(MASTERPW_FILENAME, "r");
@@ -211,7 +253,6 @@ void key_derivation_and_storage() {
 
     // Dérivation du master password
     crypto_kdf_derive_from_key(subkey1, sizeof(subkey1), 1, CONTEXT, hashed_password);
-
 
     // Écriture de la master key dans un fichier
     FILE* masterKey = fopen(MASTERKEY_FILENAME, "a+");
