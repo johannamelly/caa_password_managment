@@ -1,13 +1,16 @@
 //
-// Created by johanna on 26.04.19.
+// Created by Johanna
 //
 
 #pragma once
 #include <stdio.h>
-#include <stdbool.h>
 #include "memory.c"
 #include "password_management.c"
 
+/**
+ * Contrôle que le master password utilisateur soit correct ou, si 1ere utilisation, lui demande d'en créer un
+ * @return La clé de chiffrement et déchiffrement de mots de passes
+ */
 char* login() {
     char* masterKey = locked_allocation(crypto_aead_chacha20poly1305_KEYBYTES);
 
@@ -86,6 +89,9 @@ char* login() {
     }
 }
 
+/**
+ * Liste les entrées de mots de passe
+ */
 void list_names() {
     char* line = NULL;
     size_t len = 0;
@@ -102,6 +108,10 @@ void list_names() {
 }
 
 
+/**
+ * Retrouve et déchiffre un mot de passe à partir de son nom
+ * @param key la clé de déchiffrement
+ */
 void get_password(unsigned char* key) {
     char* name = malloc(300*sizeof(char));
     printf("What's the name of the password you'd like to get? ");
@@ -119,6 +129,10 @@ void get_password(unsigned char* key) {
     }
 }
 
+/**
+ * Chiffre et stocke un mot de passe
+ * @param key la clé de chiffrement
+ */
 void add_password(unsigned char* key) {
     char* name = malloc(300*sizeof(char));
     char* password = locked_allocation(300*sizeof(char));
@@ -128,10 +142,30 @@ void add_password(unsigned char* key) {
     printf("Good. Now please type your password. ");
     scanf("%s", password);
     const unsigned char* p = (const unsigned char*)(password);
-    password_storage(name, p, key);
+    password_storage(name, p, key, ALLPW_FILENAME);
     printf("Your password has been saved!\n\n");
 
     free_buffer(password, 300*sizeof(char));
     free(name);
+
+}
+
+/**
+ * Change le master password
+ * @param key la clé de chiffrement et déchiffrement
+ */
+char* change_mwp(unsigned char* key) {
+    char* masterKey = locked_allocation(crypto_aead_chacha20poly1305_KEYBYTES);
+
+    char* mpw = locked_allocation(36*(sizeof(char*)));
+
+    printf("Please type your new password: ");
+    scanf("%35s", mpw);
+
+    change_masterPW(mpw, key);
+
+    free_buffer(mpw, 36*sizeof(char*));
+
+    return masterKey;
 
 }

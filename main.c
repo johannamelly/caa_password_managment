@@ -1,10 +1,11 @@
+/*
+ * Created by Johanna
+ */
+
 #include <stdio.h>
 #include <sodium.h>
-#include <stdbool.h>
 #include "memory.c"
 #include "actions.c"
-#include "password_management.c"
-#include "base64.h"
 
 enum state {
     NOT_RUNNING,
@@ -16,18 +17,6 @@ enum state {
 enum state currentSate = NOT_RUNNING;
 
 int main(int argc, char*argv[]) {
-
-
-    //const char* lou = "PANTALONDEMAMANààà3éà3à3ààà";
-
-    //char* encoded = malloc(300);
-    //char* decoded = malloc(300);
-    //sodium_bin2base64(encoded, 300, lou, strlen(lou), sodium_base64_VARIANT_ORIGINAL);
-    //printf("%s", encoded);
-    //((sodium_base642bin(decoded, 300, encoded, strlen(encoded), NULL, strlen(decoded), NULL, sodium_base64_VARIANT_ORIGINAL);
-    //printf("%s", decoded);
-
-
 
     if(sodium_init() < 0){
         printf("Couldn't initialize the library");
@@ -67,6 +56,10 @@ int main(int argc, char*argv[]) {
                         list_names();
                         printf("\n");
                         break;
+                    case 4:
+                        masterKey = change_mwp((unsigned char*)masterKey);
+                        currentSate = LOCKED;
+                        break;
                     case 5:
                         free_buffer(masterKey, crypto_aead_chacha20poly1305_KEYBYTES);
                         printf("Session locked.\n");
@@ -81,6 +74,7 @@ int main(int argc, char*argv[]) {
                         currentSate = NOT_RUNNING;
                         return 0;
                 }
+                choice = 0;
             }
         } else {
             if(masterKey != NULL) {
@@ -88,35 +82,6 @@ int main(int argc, char*argv[]) {
             }
         }
     }
-
-
-
-
-
-
-   /*
-        char* name = malloc(36*(sizeof(char*)));
-        char* password = locked_allocation(36*(sizeof(char*)));
-        printf("For what website or software would you like to store your password? ");
-        scanf("%36s", name);
-        printf("Now please type your password: ");
-        scanf("%36s", password);
-
-        if(password_storage(name, password)) {
-            printf("oui\n");
-        } else {
-            printf("non\n");
-        }
-        free_buffer(password, 36* sizeof(char*));
-
-*/
-        //password_recover("telegram");
-/*
-
-        char buf[20];
-        randombytes_buf(buf, 20);
-        printf("%s",buf);
-*/
 
     return 0;
 }

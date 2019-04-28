@@ -1,5 +1,5 @@
 //
-// Created by johanna on 10.04.19.
+// Created by Johanna
 //
 #pragma once
 
@@ -8,6 +8,11 @@
 #include <memory.h>
 #include <errno.h>
 
+/**
+ * Alloue de la mémoire de manière sécurisée
+ * @param nb_bytes nombre de bytes à allouer
+ * @return pointeur sur la mémoire allouée
+ */
 void* locked_allocation(size_t nb_bytes){
 
     void* mem = sodium_malloc(nb_bytes);
@@ -24,6 +29,12 @@ void* locked_allocation(size_t nb_bytes){
     return mem;
 }
 
+/**
+ * Libère la mémoire
+ * @param mem pointeur sur la mémoire à libérer
+ * @param nb_bytes nombre de bytes à libérer
+ * @return
+ */
 void * free_buffer(void* mem, size_t nb_bytes) {
     sodium_munlock(mem, nb_bytes);
     sodium_free(mem);
