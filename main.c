@@ -16,6 +16,8 @@ enum state {
 enum state currentSate = NOT_RUNNING;
 
 int main(int argc, char*argv[]) {
+
+
     //const char* lou = "PANTALONDEMAMANààà3éà3à3ààà";
 
     //char* encoded = malloc(300);
@@ -25,19 +27,21 @@ int main(int argc, char*argv[]) {
     //((sodium_base642bin(decoded, 300, encoded, strlen(encoded), NULL, strlen(decoded), NULL, sodium_base64_VARIANT_ORIGINAL);
     //printf("%s", decoded);
 
-    currentSate = LOCKED;
 
-    int choice;
 
     if(sodium_init() < 0){
         printf("Couldn't initialize the library");
         return(-1);
     }
 
+    currentSate = LOCKED;
+    int choice;
+    char* masterKey;
+
     printf("Welcome!\n");
 
     while(currentSate == LOCKED) {
-        if(login()){
+        if((masterKey = login()) != NULL){
             currentSate = UNLOCKED;
 
             while(currentSate == UNLOCKED) {
@@ -53,10 +57,10 @@ int main(int argc, char*argv[]) {
                 scanf("%d", &choice);
                 switch(choice){
                     case 1:
-                        add_password();
+                        add_password((unsigned char*)masterKey);
                         break;
                     case 2:
-                        get_password();
+                        get_password((unsigned char*)masterKey);
                         break;
                     case 3:
                         printf("You store passwords for: ");
@@ -64,16 +68,23 @@ int main(int argc, char*argv[]) {
                         printf("\n");
                         break;
                     case 5:
+                        free_buffer(masterKey, crypto_aead_chacha20poly1305_KEYBYTES);
                         printf("Session locked.\n");
                         currentSate = LOCKED;
                         break;
                     case 6:
+                        free_buffer(masterKey, crypto_aead_chacha20poly1305_KEYBYTES);
                         currentSate = NOT_RUNNING;
                         return 0;
                     default:
+                        free_buffer(masterKey, crypto_aead_chacha20poly1305_KEYBYTES);
                         currentSate = NOT_RUNNING;
                         return 0;
                 }
+            }
+        } else {
+            if(masterKey != NULL) {
+                free_buffer(masterKey, crypto_aead_chacha20poly1305_KEYBYTES);
             }
         }
     }
@@ -83,7 +94,6 @@ int main(int argc, char*argv[]) {
 
 
 
-    printf("%s", password_recover("johanna"));
    /*
         char* name = malloc(36*(sizeof(char*)));
         char* password = locked_allocation(36*(sizeof(char*)));
