@@ -2,13 +2,12 @@
 // Created by Johanna
 //
 
+#pragma once
 #include <stdbool.h>
 #include <stdio.h>
 #include <sodium.h>
 #include <memory.h>
 #include "memory.c"
-#include "base64.h"
-#pragma once
 
 const char* SALT_FILENAME = "salt.txt";
 const char* MASTERPW_FILENAME = "masterPW.txt";
@@ -31,7 +30,7 @@ bool masterPassword_storage(char* mpw) {
 
     // Hachage du mot de passe
     if(crypto_pwhash_argon2id_str(hashed_password, mpw, strlen(mpw),
-                                  1, crypto_pwhash_argon2id_MEMLIMIT_SENSITIVE) != 0 ){
+                                  20, crypto_pwhash_argon2id_MEMLIMIT_SENSITIVE) != 0 ){
         // Si erreur, libération du pointeur
         free_buffer(hashed_password, crypto_pwhash_STRBYTES);
         return false;
@@ -113,6 +112,7 @@ bool masterPWdefined() {
  * @param name nom de l'entrée
  * @param password mot de passe non chiffré
  * @param key clé de chiffrement
+ * @param file nom du fichier dans lequel stocker les mots de passe
  */
 void password_storage(char* name, const unsigned char* password, unsigned char* key, const char* file) {
 
@@ -137,9 +137,8 @@ void password_storage(char* name, const unsigned char* password, unsigned char* 
     char* nonceB64 = malloc(300);
     char* cipherB64 = malloc(300);
 
-    //printf("NONCE: %s\n CIPHER: %s\n", nonce, ciphertext);
 
-
+    // Encodage en base 64
     sodium_bin2base64(nonceB64, 300, nonce, strlen((char*)nonce), sodium_base64_VARIANT_ORIGINAL);
     sodium_bin2base64(cipherB64, 300, ciphertext, strlen((char*)ciphertext), sodium_base64_VARIANT_ORIGINAL);
 
@@ -211,7 +210,6 @@ unsigned char* password_recover(char* name, unsigned char* key) {
     // Si aucune entrée trouvée
     if(nonce == NULL || cipher == NULL) {
         // Libération des pointeurs
-        printf("NULL");
         free_buffer(password, 300);
         free(nonceDecoded);
         free(cipherDecoded);
@@ -222,19 +220,11 @@ unsigned char* password_recover(char* name, unsigned char* key) {
     size_t lenDecodedCipher;
 
 
-
-    //printf("cipher: %s\n nonce: %s\n", cipher, nonce);
-
-
     sodium_base642bin(nonceDecoded, crypto_aead_chacha20poly1305_NPUBBYTES, nonce, strlen(nonce), NULL, &lenDecodedNonce, NULL, sodium_base64_VARIANT_ORIGINAL);
     sodium_base642bin(cipherDecoded, 300, cipher, strlen(cipher), NULL, &lenDecodedCipher, NULL, sodium_base64_VARIANT_ORIGINAL);
 
-    //printf("taille nonce %zu\n taille cipher %zu\n", lenDecodedNonce, lenDecodedCipher);
-
     nonceDecoded[crypto_aead_chacha20poly1305_NPUBBYTES] = 0;
     cipherDecoded[lenDecodedCipher] = 0;
-
-    //printf("decoded nonce: %s\n decoded cipher: %s\n", nonceDecoded, cipherDecoded);
 
     // Déchiffrement
     if (crypto_aead_chacha20poly1305_decrypt(password, &password_len,
@@ -283,7 +273,6 @@ char* get_key(char* masterPW) {
     fread (salt, 1, (size_t )len, saltFile);
     fclose(saltFile);
 
-    printf("%s", salt);
     // Dérivation du master password
     if (crypto_pwhash
                 (key, crypto_aead_chacha20poly1305_KEYBYTES, masterPW, strlen(masterPW), salt,
@@ -330,7 +319,6 @@ char* key_derivation_and_storage(char* masterPW) {
     }else {
         printf("Key successfully generated!\n");
     }
-    printf("%s", salt);
 
     // Écriture du sel dans un fichier
     FILE* saltFile = fopen(SALT_FILENAME, "a+");
@@ -356,25 +344,30 @@ char* key_derivation_and_storage(char* masterPW) {
  * @param oldKey clé de chiffrement et déchiffrement actuellement utilisée
  * @return la nouvelle clé de chiffrement et déchiffrement
  */
-char* change_masterPW(char* masterPW, unsigned char* oldKey) {
+void change_masterPW(char* masterPW, unsigned char* oldKey) {
 
     remove(MASTERPW_FILENAME);
-    masterPassword_storage(masterPW);
-
+    if(!masterPassword_storage(masterPW)) {
+        printf("Problem while storing your new master password.\n");
+        return;
+    }
 
     char* newKey = key_derivation_and_storage(masterPW);
+
+    if(newKey == NULL) {
+        printf("There was a problem generating your key.\n");
+    }
 
     char* line = NULL;
     size_t len = 0;
     char* name = NULL;
-    char* cipher = NULL;
-    char* nonce = NULL;
-
 
 // Récupération du mot de passe chiffré et du nonce correspondant
     FILE* allPW = fopen(ALLPW_FILENAME, "r");
     if(allPW == NULL) {
-        return NULL;
+        printf("There was no password to re-encrypt.\n");
+        free_buffer(newKey, crypto_aead_chacha20poly1305_KEYBYTES);
+        return;
     }
 
     // Parcours ligne par ligne
@@ -384,12 +377,8 @@ char* change_masterPW(char* masterPW, unsigned char* oldKey) {
         name = strtok(line, SEPARATOR);
         unsigned char* password = password_recover(name, oldKey);
         if(password != NULL){
-            printf("%s %s\n", name, password);
             password_storage(name, password, (unsigned char*)newKey, TEMPORARY_FILE);
-            //free(password);
         }
-
-
     }
 
     remove(ALLPW_FILENAME);
@@ -397,6 +386,6 @@ char* change_masterPW(char* masterPW, unsigned char* oldKey) {
 
     fclose(allPW);
 
-    return newKey;
+    free_buffer(newKey, crypto_aead_chacha20poly1305_KEYBYTES);
 
 }

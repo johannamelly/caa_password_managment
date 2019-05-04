@@ -57,7 +57,7 @@ int main(int argc, char*argv[]) {
                         printf("\n");
                         break;
                     case 4:
-                        masterKey = change_mwp((unsigned char*)masterKey);
+                        change_mwp((unsigned char*)masterKey);
                         currentSate = LOCKED;
                         break;
                     case 5:
